@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace NeosDialogBuilder
+namespace NeosDialogBuilder//TODO: create custom editor
 {
     /// <summary>
     /// represents a range of pages numbers
