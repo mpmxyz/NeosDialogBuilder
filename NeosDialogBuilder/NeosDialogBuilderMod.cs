@@ -35,7 +35,7 @@ namespace NeosDialogBuilder
         {
             static bool Prefix(CommonTool tool, ContextMenu menu)
             {
-                var item = menu.AddItem("Test dialog", (Uri) null, color.Black);
+                var item = menu.AddItem("Test dialog", (Uri)null, color.Black);
                 item.Button.LocalPressed += (b, e) => new DialogBuilder<TestDialog>()
                 .BuildWindow(
                     "Test",

@@ -34,12 +34,14 @@ namespace NeosDialogBuilder
             }
             uiBuilder.NestOut();
             uiBuilder.PopStyle();
-            return (allErrors, (errors, unboundErrors) => {
+            return (allErrors, (errors, unboundErrors) =>
+            {
                 foreach (var errorSetter in allErrorSetters)
                 {
                     errorSetter(errors, unboundErrors);
                 }
-            });
+            }
+            );
         }
     }
 }

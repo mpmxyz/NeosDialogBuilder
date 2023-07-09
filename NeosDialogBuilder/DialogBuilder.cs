@@ -81,7 +81,7 @@ namespace NeosDialogBuilder
                         typeof(FieldInfo)
                     }
                 );
-            var field = (IDialogEntryDefinition<T>) cons.Invoke(new object[] { conf, fieldInfo });
+            var field = (IDialogEntryDefinition<T>)cons.Invoke(new object[] { conf, fieldInfo });
             return AddEntry(field);
         }
 
