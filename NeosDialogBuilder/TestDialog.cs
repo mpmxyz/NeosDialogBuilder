@@ -7,8 +7,6 @@ namespace NeosDialogBuilder
 {
     internal class TestDialog : IDialog
     {
-        Slot a;
-
         [DialogOption("Output")]
         IField<string> output;
 
@@ -23,7 +21,7 @@ namespace NeosDialogBuilder
             UniLog.Log("OnLeft");
             if (output != null)
             {
-                output.Value = "OnLeft";
+                output.World.RunSynchronously(() => output.Value = "OnLeft");
             }
         }
 
@@ -33,7 +31,7 @@ namespace NeosDialogBuilder
             UniLog.Log("OnMiddle");
             if (output != null)
             {
-                output.Value = "OnMiddle";
+                output.World.RunSynchronously(() => output.Value = "OnMiddle");
             }
         }
 
@@ -43,20 +41,20 @@ namespace NeosDialogBuilder
             UniLog.Log("OnRight");
             if (output != null)
             {
-                output.Value = "OnRight";
+                output.World.RunSynchronously(() => output.Value = "OnRight");
             }
         }
 
-        public void OnClose()
+        public void OnDestroy()
         {
-            UniLog.Log("OnClose");
+            UniLog.Log("OnDestroy");
             if (output != null)
             {
-                output.Value = "OnClose";
+                output.World.RunSynchronously(() => output.Value = "OnDestroy");
             }
         }
 
-        public IDictionary<string, string> Validate()
+        public IDictionary<string, string> UpdateAndValidate()
         {
             UniLog.Log($"Validate {matrix} {text} {output}");
             var errors = new Dictionary<string, string>();
@@ -71,6 +69,10 @@ namespace NeosDialogBuilder
             if (text == null || !text.Any())
             {
                 errors.Add(nameof(text), "Missing text");
+            }
+            else if (text.ToLowerInvariant() == text && matrix.m00 == 0.0)
+            {
+                errors.Add("special", "lowercase text and matrix_0_0 == 0");
             }
             if (output != null)
             {

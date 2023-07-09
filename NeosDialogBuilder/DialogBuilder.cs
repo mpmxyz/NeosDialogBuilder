@@ -5,31 +5,36 @@ using FrooxEngine.UIX;
 using System.Reflection;
 using System;
 using static NeosDialogBuilder.NeosDialogBuilderMod;
-using System.Linq;
 
-namespace NeosDialogBuilder//TODO: fix .github
+namespace NeosDialogBuilder
 {
     /// <summary>
     /// Helper class to create an import dialog
     /// </summary>
     public partial class DialogBuilder<T> where T : IDialog
     {
-        private readonly IList<IDialogOptionField<T>> options = new List<IDialogOptionField<T>>();
-        public bool hasErrorOverflow = false;
-        private readonly IList<DialogActionMethod<T>> actions = new List<DialogActionMethod<T>>();
+        private readonly IList<IDialogEntryDefinition<T>> entries = new List<IDialogEntryDefinition<T>>();
+        private readonly Func<(IDictionary<string, string>, IDictionary<string, string>)> customUpdateAndValidate;
 
-        public DialogBuilder(bool autoAdd = true, bool hasErrorOverflow = false)
+        public DialogBuilder(bool addDefaults = true, Func<(IDictionary<string, string>, IDictionary<string, string>)> customUpdateAndValidate = null)
         {
-            if (autoAdd)
+            if (addDefaults)
             {
-                AutoAddOptions();
-                AutoAddActions();
+                AddAllOptions();
+                AddUnboundErrorDisplay();
+                AddAllActions();
             }
 
-            this.hasErrorOverflow = hasErrorOverflow;
+            this.customUpdateAndValidate = customUpdateAndValidate;
         }
 
-        public DialogBuilder<T> AutoAddOptions()
+        public DialogBuilder<T> AddEntry(IDialogEntryDefinition<T> optionField)
+        {
+            entries.Add(optionField);
+            return this;
+        }
+
+        public DialogBuilder<T> AddAllOptions()
         {
             var converterType = typeof(T);
 
@@ -47,159 +52,123 @@ namespace NeosDialogBuilder//TODO: fix .github
             return this;
         }
 
-        public DialogBuilder<T> AutoAddActions()
+        public DialogBuilder<T> AddAllActions()
         {
             var converterType = typeof(T);
-
+            var actions = new List<DialogAction<T>>();
             foreach (var methodInfo in converterType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 foreach (var attr in methodInfo.GetCustomAttributes(true))
                 {
                     if (attr is DialogActionAttribute conf)
                     {
-                        AddAction(conf, (dialog) => methodInfo.Invoke(dialog, new object[] { }));
+                        actions.Add(new DialogAction<T>(conf, (dialog) => methodInfo.Invoke(dialog, new object[] { })));
                         break;
                     }
                 }
             }
+            AddActionLine(actions);
+
             return this;
         }
 
         public DialogBuilder<T> AddOption(DialogOptionAttribute conf, FieldInfo fieldInfo)
         {
-            var genType = typeof(DialogOptionField<,>).MakeGenericType(typeof(T), fieldInfo.FieldType);
+            var genType = typeof(DialogOption<,>).MakeGenericType(typeof(T), fieldInfo.FieldType);
             var cons = genType.GetConstructor(
                     new Type[] {
                         typeof(DialogOptionAttribute),
                         typeof(FieldInfo)
                     }
                 );
-            var field = (IDialogOptionField<T>) cons.Invoke(new object[] { conf, fieldInfo });
-            return AddOption(field);
+            var field = (IDialogEntryDefinition<T>) cons.Invoke(new object[] { conf, fieldInfo });
+            return AddEntry(field);
         }
 
-        public DialogBuilder<T> AddOption(IDialogOptionField<T> optionField)
+        public DialogBuilder<T> AddActionLine(IEnumerable<DialogAction<T>> actions)
         {
-            options.Add(optionField);
+            AddEntry(new DialogLine<T>(actions));
             return this;
         }
 
-        public DialogBuilder<T> AddAction(DialogActionAttribute conf, Action<T> action)
+        public DialogBuilder<T> AddUnboundErrorDisplay()
         {
-            return AddAction(new DialogActionMethod<T>(conf, action));
-        }
-
-        public DialogBuilder<T> AddAction(DialogActionMethod<T> action)
-        {
-            actions.Add(action);
+            AddEntry(new DialogErrorDisplay<T>(onlyUnbound: true));
             return this;
         }
 
-        public void BuildInPlace(UIBuilder uiBuilder, T dialog, bool privateEnvironment = false)
+        public void BuildInPlace(UIBuilder uiBuilder, T dialog)
         {
-            var errorSetters = new Dictionary<string, Action<string>>();
-            var knownErrors = new Dictionary<string, string>();
-            var validationSetters = new List<Action<IDictionary<string, string>>>();
-            Action<IEnumerable<string>> setUnassignedErrors = null;
+            var errorSetters = new List<Action<IDictionary<string, string>, IDictionary<string, string>>>();
+            var boundErrorKeys = new HashSet<string>();
+            var world = uiBuilder.World;
+            var inUserspace = world.IsUserspace();
 
-            void onChange()
+            uiBuilder.Root.OnPrepareDestroy += (slot) => dialog.OnDestroy();
+
+            (IDictionary<string, string>, IDictionary<string, string>) onChange()
             {
-                var errors = dialog.Validate();
-                var unassignedErrors = new List<string>();
-                foreach (var error in errors)
+                IDictionary<string, string> errors, unboundErrors;
+                if (customUpdateAndValidate != null)
                 {
-                    if (errorSetters.TryGetValue(error.Key, out Action<string> setter))
-                    {
-                        setter(error.Value);
-                    }
-                    else
-                    {
-                        unassignedErrors.Add(error.Value);
-                    }
+                    (errors, unboundErrors) = customUpdateAndValidate();
                 }
-                foreach (var previousError in knownErrors)
+                else
                 {
-                    if (
-                        !errors.ContainsKey(previousError.Key)
-                        && errorSetters.TryGetValue(previousError.Key, out Action<string> setter)
-                    )
+                    errors = dialog.UpdateAndValidate();
+                    unboundErrors = new Dictionary<string, string>(errors);
+                    foreach (var errorKey in boundErrorKeys)
                     {
-                        setter(null);
+                        unboundErrors.Remove(errorKey);
                     }
                 }
 
-                if (setUnassignedErrors != null)
+                world.RunSynchronously(() =>
                 {
-                    unassignedErrors.Sort();
-                    setUnassignedErrors(unassignedErrors);
-                }
+                    foreach (var setErrors in errorSetters)
+                    {
+                        setErrors(errors, unboundErrors);
+                    }
+                });
 
-                foreach (var validSetter in validationSetters)
+                return (errors, unboundErrors);
+            }
+
+            foreach (var option in entries)
+            {
+                (var keys, var setErrors) = option.Create(uiBuilder, dialog, onChange, inUserspace);
+                errorSetters.Add(setErrors);
+                foreach (var key in keys)
                 {
-                    validSetter(errors);
+                    boundErrorKeys.Add(key);
                 }
-                knownErrors = new Dictionary<string, string>(errors);
             }
 
-            foreach (var option in options)
-            {
-                (var key, var setError) = option.Build(uiBuilder, dialog, onChange, privateEnvironment);
-                errorSetters.Add(key, setError);
-            }
-
-            if (hasErrorOverflow)
-            {
-                uiBuilder.Style.FlexibleHeight = 1f;
-                //TODO: create place to put unassignedErrors
-            }
-
-            uiBuilder.Style.FlexibleHeight = -1;
-            uiBuilder.Style.MinHeight = BUTTON_HEIGHT;
-            uiBuilder.Style.PreferredHeight = BUTTON_HEIGHT;
-            uiBuilder.Style.ForceExpandWidth = true;
-
-            uiBuilder.HorizontalLayout(SPACING);
-            uiBuilder.Style.FlexibleWidth = 1;
-
-            foreach (var action in actions)
-            {
-                var setValidation = action.Build(uiBuilder, dialog);
-                validationSetters.Add(setValidation);
-            }
-            //TODO: pop out of scroll area
             onChange();
         }
 
-        public Slot BuildWindow(
-            string title,
-            World world,
-            float3 position,
-            floatQ rotation,
-            float3 scale,
-            T dialog,
-            bool privateEnvironment = false)
+        public Slot BuildWindow(string title, World world, T dialog)
         {
-            var slot = world.AddSlot(title, false);
-            slot.GlobalPosition = position;
-            slot.GlobalRotation = rotation;
-            slot.GlobalScale = scale;
+            var slot = world.AddSlot(title, persistent: false);
 
             var panel = slot.AttachComponent<NeosCanvasPanel>();
             panel.Panel.Title = title;
             panel.Panel.AddCloseButton();
-            panel.CanvasSize = CONFIG_CANVAS_SIZE; //TODO: auto-calculate canvas size, clamped to max-size
+            panel.CanvasSize = CONFIG_CANVAS_SIZE;
             panel.CanvasScale = CONFIG_PANEL_HEIGHT / panel.CanvasSize.y;
 
             var uiBuilder = new UIBuilder(panel.Canvas);
 
             uiBuilder.ScrollArea();
-            uiBuilder.VerticalLayout(SPACING); //cannot measure size here
-            var content = uiBuilder.VerticalLayout(SPACING).Slot; //solution: extra layer for content
-            uiBuilder.FitContent(SizeFit.Disabled, SizeFit.PreferredSize);
-            BuildInPlace(uiBuilder, dialog, privateEnvironment);
+            uiBuilder.VerticalLayout(SPACING);                      //problem: cannot measure size here
+            var content = uiBuilder.VerticalLayout(SPACING).Slot;   //solution: extra layer for content
+            uiBuilder.FitContent(SizeFit.Disabled, SizeFit.PreferredSize); //TODO: clamp to max-size
+            BuildInPlace(uiBuilder, dialog);
 
             var sizeDriver = content.AttachComponent<RectSizeDriver>();
             sizeDriver.TargetSize.Target = panel.Canvas.Size;
+
+            slot.PositionInFrontOfUser(float3.Backward);
 
             return slot;
         }

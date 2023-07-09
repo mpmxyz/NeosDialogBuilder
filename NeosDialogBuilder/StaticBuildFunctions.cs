@@ -3,6 +3,7 @@ using FrooxEngine;
 using FrooxEngine.UIX;
 using System;
 using System.Reflection;
+using static HarmonyLib.Code;
 using static NeosDialogBuilder.NeosDialogBuilderMod;
 
 namespace NeosDialogBuilder
@@ -10,7 +11,7 @@ namespace NeosDialogBuilder
     internal class StaticBuildFunctions
     {
 
-        internal static void BuildEditor(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange, UIBuilder uiBuilder, DialogOptionAttribute conf, bool privateEnvironment = false)
+        internal static void BuildEditor(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange, UIBuilder uiBuilder, DialogOptionAttribute conf)
         {
             if (ifieldSlot == null)
             {
@@ -31,9 +32,9 @@ namespace NeosDialogBuilder
                 prop,
                 uiBuilder
             );
-            if (conf.secret && !privateEnvironment && uiBuilder.Current.ChildrenCount > 0)
+            if (conf.secret && uiBuilder.Current.ChildrenCount > 0)
             {
-                Slot added = uiBuilder.Current[uiBuilder.Current.ChildrenCount - 1];
+                Slot added = uiBuilder.Current;
                 added.ForeachComponentInChildren<TextField>(textField =>
                     {
                         var patternField = textField.Text?.MaskPattern;
@@ -46,7 +47,7 @@ namespace NeosDialogBuilder
             }
         }
 
-        internal static void BuildSecretButton(string name, UIBuilder uiBuilder, Action<UIBuilder> createFields)
+        internal static void BuildSecretButton(string name, UIBuilder uiBuilder, Action onClick)
         {
             uiBuilder.PushStyle();
             uiBuilder.Style.MinHeight = 24f;
@@ -61,41 +62,11 @@ namespace NeosDialogBuilder
             uiBuilder.CurrentRect.AnchorMin.Value = new float2(0.25f);
             button.LocalPressed += (b, d) =>
             {
-                CreateUserSpacePopup(TITLE_SECRET_EDIT_PANEL, createFields);
+                onClick();
             };
 
             uiBuilder.NestOut();
             uiBuilder.PopStyle();
-        }
-
-        private static void CreateUserSpacePopup(string title, Action<UIBuilder> createFields)
-        {
-            Userspace.UserspaceWorld.RunSynchronously(() =>
-            {
-                Slot slot = Userspace.UserspaceWorld.AddSlot(TITLE_SECRET_EDIT_PANEL, persistent: false);
-                var panel = slot.AttachComponent<NeosCanvasPanel>();
-                panel.Panel.Title = title;
-                panel.CanvasSize = USERSPACE_CANVAS_SIZE;
-                panel.CanvasScale = USERSPACE_PANEL_HEIGHT / panel.CanvasSize.y;
-
-                var uiBuilder = new UIBuilder(panel.Canvas);
-                uiBuilder.ScrollArea();
-                uiBuilder.VerticalLayout(SPACING);
-
-                createFields(uiBuilder);
-
-                uiBuilder.Style.FlexibleHeight = -1;
-                uiBuilder.Style.MinHeight = BUTTON_HEIGHT;
-                uiBuilder.Style.PreferredHeight = BUTTON_HEIGHT;
-
-                Button trigger = uiBuilder.Button(LABEL_USERSPACE_DIALOG_CLOSE);
-                trigger.LocalPressed += (button, data) =>
-                {
-                    slot.Destroy();
-                };
-
-                slot.PositionInFrontOfUser(float3.Backward);
-            });
         }
 
         private static IField BuildField(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange)
@@ -121,18 +92,12 @@ namespace NeosDialogBuilder
 
         private static IField BuildReferenceField<V>(Slot slot, object obj, FieldInfo prop, Action onChange) where V : class, IWorldElement
         {
-            UniLog.Log($"{typeof(V)} {slot?.Name} {obj} {prop?.Name}");
             var value = slot.AttachComponent<ReferenceField<V>>().Reference;
-            UniLog.Log(value);
             value.Target = (V)prop.GetValue(obj);
             value.OnTargetChange += (x) =>
             {
-                UniLog.Log($"RefChange {x.Target} {x.Value}");
-                UniLog.Log($"Types {x.Target?.GetType()} {typeof(V)} {prop.FieldType}");
                 prop.SetValue(obj, x.Target);
-                UniLog.Log($"now: {prop.GetValue(obj)}");
                 onChange();
-                UniLog.Log($"Finished");
             };
             return value;
         }

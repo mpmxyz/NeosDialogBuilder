@@ -9,15 +9,15 @@ namespace NeosDialogBuilder
     public interface IDialog
     {
         /// <summary>
-        /// Checks if Accept can be called
+        /// Updates internal state and checks for errors
         /// </summary>
         /// <returns>a mapping from field name to the associated error,
-        /// disables the accept button if non-empty</returns>
-        IDictionary<string, string> Validate();
+        /// disables the validated buttons if non-empty</returns>
+        IDictionary<string, string> UpdateAndValidate();
 
         /// <summary>
-        /// Called when the dialog has been closed (e.g. via the X button)
+        /// Called when the dialog is in the process of being destroyed (e.g. via the X button)
         /// </summary>
-        void OnClose();//TODO: put on Slot.onDestroy or similar
+        void OnDestroy();
     }
 }
