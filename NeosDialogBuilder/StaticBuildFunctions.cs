@@ -3,7 +3,6 @@ using FrooxEngine;
 using FrooxEngine.UIX;
 using System;
 using System.Reflection;
-using static HarmonyLib.Code;
 using static NeosDialogBuilder.NeosDialogBuilderMod;
 
 namespace NeosDialogBuilder

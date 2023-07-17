@@ -4,13 +4,21 @@ using System.Collections.Generic;
 
 namespace NeosDialogBuilder
 {
+    /// <summary>
+    /// Defines a line of horizontally arranged sub-elements
+    /// </summary>
+    /// <typeparam name="T">type of the dialog object</typeparam>
     public class DialogLine<T> : IDialogEntryDefinition<T> where T : IDialog
     {
-        private readonly IEnumerable<IDialogEntryDefinition<T>> entries;
+        private readonly IEnumerable<IDialogEntryDefinition<T>> elements;
 
-        public DialogLine(IEnumerable<IDialogEntryDefinition<T>> entries)
+        /// <summary>
+        /// Creates a line of sub-elements
+        /// </summary>
+        /// <param name="elements"></param>
+        public DialogLine(IEnumerable<IDialogEntryDefinition<T>> elements)
         {
-            this.entries = entries;
+            this.elements = elements;
         }
 
         public (IEnumerable<string>, Action<IDictionary<string, string>, IDictionary<string, string>>)
@@ -23,7 +31,7 @@ namespace NeosDialogBuilder
             uiBuilder.HorizontalLayout(spacing: NeosDialogBuilderMod.SPACING);
             uiBuilder.Style.FlexibleWidth = 1;
             uiBuilder.Style.ForceExpandWidth = true;
-            foreach (var entry in entries)
+            foreach (var entry in elements)
             {
                 (var errors, var errorSetter) = entry.Create(uiBuilder, dialog, onChange, inUserspace);
                 allErrorSetters.Add(errorSetter);

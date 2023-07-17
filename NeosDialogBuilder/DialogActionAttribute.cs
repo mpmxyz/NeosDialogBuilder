@@ -3,7 +3,7 @@
 namespace NeosDialogBuilder
 {
     /// <summary>
-    /// Attributes fields representing a dialog action
+    /// Attributes methods representing a dialog action (no arguments)
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public class DialogActionAttribute : Attribute

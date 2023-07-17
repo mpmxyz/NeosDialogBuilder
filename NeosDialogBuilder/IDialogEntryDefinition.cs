@@ -8,8 +8,10 @@ namespace NeosDialogBuilder
     /// An object specifying a dialog entry
     /// </summary>
     /// <typeparam name="T">type of the dialog object</typeparam>
-    public interface IDialogEntryDefinition<in T> where T : IDialog
+    public interface IDialogEntryDefinition<in T> where T : IDialog //TODO: custom enum handling
     {
+        //TODO: change onChange to accept argument of type T?
+        //TODO: invent something to update visibility
         /// <summary>
         /// Creates a dialog entry
         /// </summary>

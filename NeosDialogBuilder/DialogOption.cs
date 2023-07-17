@@ -7,12 +7,22 @@ using System.Collections.Generic;
 
 namespace NeosDialogBuilder
 {
+    /// <summary>
+    /// Defines a configuration option in the dialog window
+    /// </summary>
+    /// <typeparam name="T">type of the dialog object</typeparam>
+    /// <typeparam name="V">type of the edited value</typeparam>
     public class DialogOption<T, V> : IDialogEntryDefinition<T> where T : IDialog
     {
         private readonly DialogOptionAttribute conf;
 
         private readonly FieldInfo fieldInfo;
 
+        /// <summary>
+        /// Creates a configuration option
+        /// </summary>
+        /// <param name="conf">displayed name, secrecy and error output options</param>
+        /// <param name="fieldInfo">field of <typeparamref name="T"/> which will be edited</param>
         public DialogOption(DialogOptionAttribute conf, FieldInfo fieldInfo)
         {
             this.conf = conf;
@@ -55,6 +65,9 @@ namespace NeosDialogBuilder
             }
         }
 
+        /// <summary>
+        /// represents a dialog that edits a single value in userspace
+        /// </summary>
         private class SecretDialog
         {
             private readonly DialogBuilder<T> dialogBuilder;
@@ -64,7 +77,7 @@ namespace NeosDialogBuilder
 
             public SecretDialog(DialogOption<T, V> option, T dialog, Func<(IDictionary<string, string>, IDictionary<string, string>)> onChangeSource)
             {
-                this.dialogBuilder = new DialogBuilder<T>(addDefaults: false, customUpdateAndValidate: onChangeSource)
+                this.dialogBuilder = new DialogBuilder<T>(addDefaults: false, overrideUpdateAndValidate: (_) => onChangeSource())
                         .AddEntry(option)
                         .AddEntry(new DialogAction<T>(
                             new DialogActionAttribute(NeosDialogBuilderMod.LABEL_USERSPACE_DIALOG_CLOSE, isValidated: false),

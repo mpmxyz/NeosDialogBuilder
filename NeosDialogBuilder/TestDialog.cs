@@ -5,6 +5,9 @@ using System.Linq;
 
 namespace NeosDialogBuilder
 {
+    /// <summary>
+    /// This class demonstrates how to use the library.
+    /// </summary>
     internal class TestDialog : IDialog
     {
         [DialogOption("Output")]
