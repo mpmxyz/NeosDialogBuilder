@@ -11,7 +11,7 @@ namespace NeosDialogBuilder
     /// Defines a simple button with an action
     /// </summary>
     /// <typeparam name="T">type of the expected dialog object</typeparam>
-    public class DialogAction<T> : IDialogEntryDefinition<T> where T : IDialog
+    public class DialogActionDefinition<T> : IDialogEntryDefinition<T> where T : IDialogState
     {
         private readonly DialogActionAttribute conf;
 
@@ -22,14 +22,14 @@ namespace NeosDialogBuilder
         /// </summary>
         /// <param name="conf">displayed text and validation behaviour</param>
         /// <param name="action">Action that is triggered when pressing the button</param>
-        public DialogAction(DialogActionAttribute conf, Action<T> action)
+        public DialogActionDefinition(DialogActionAttribute conf, Action<T> action)
         {
             this.conf = conf;
             this.action = action;
         }
 
-        public (IEnumerable<string>, Action<IDictionary<string, string>, IDictionary<string, string>>)
-            Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<string, string>, IDictionary<string, string>)> onChange, bool inUserspace = false)
+        public IDialogElement
+            Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChange, bool inUserspace = false)
         {
             uiBuilder.PushStyle();
             uiBuilder.Style.PreferredHeight = NeosDialogBuilderMod.BUTTON_HEIGHT;

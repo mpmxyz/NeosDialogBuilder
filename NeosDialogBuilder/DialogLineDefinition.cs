@@ -8,7 +8,7 @@ namespace NeosDialogBuilder
     /// Defines a line of horizontally arranged sub-elements
     /// </summary>
     /// <typeparam name="T">type of the dialog object</typeparam>
-    public class DialogLine<T> : IDialogEntryDefinition<T> where T : IDialog
+    public class DialogLineDefinition<T> : IDialogEntryDefinition<T> where T : IDialogState
     {
         private readonly IEnumerable<IDialogEntryDefinition<T>> elements;
 
@@ -16,15 +16,15 @@ namespace NeosDialogBuilder
         /// Creates a line of sub-elements
         /// </summary>
         /// <param name="elements"></param>
-        public DialogLine(IEnumerable<IDialogEntryDefinition<T>> elements)
+        public DialogLineDefinition(IEnumerable<IDialogEntryDefinition<T>> elements)
         {
             this.elements = elements;
         }
 
-        public (IEnumerable<string>, Action<IDictionary<string, string>, IDictionary<string, string>>)
-            Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<string, string>, IDictionary<string, string>)> onChange, bool inUserspace = false)
+        public IDialogElement
+            Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChange, bool inUserspace = false)
         {
-            var allErrorSetters = new List<Action<IDictionary<string, string>, IDictionary<string, string>>>();
+            var allErrorSetters = new List<Action<IDictionary<object, string>, IDictionary<object, string>>>();
             var allErrors = new HashSet<string>();
 
             uiBuilder.PushStyle();

@@ -12,7 +12,7 @@ namespace NeosDialogBuilder
     /// </summary>
     /// <typeparam name="T">type of the dialog object</typeparam>
     /// <typeparam name="V">type of the edited value</typeparam>
-    public class DialogOption<T, V> : IDialogEntryDefinition<T> where T : IDialog
+    public class DialogOptionDefinition<T, V> : IDialogEntryDefinition<T> where T : IDialogState
     {
         private readonly DialogOptionAttribute conf;
 
@@ -22,21 +22,21 @@ namespace NeosDialogBuilder
         /// Creates a configuration option
         /// </summary>
         /// <param name="conf">displayed name, secrecy and error output options</param>
-        /// <param name="fieldInfo">field of <typeparamref name="T"/> which will be edited</param>
-        public DialogOption(DialogOptionAttribute conf, FieldInfo fieldInfo)
+        /// <param name="fieldInfo">field of type <typeparamref name="T"/> which will be edited</param>
+        public DialogOptionDefinition(DialogOptionAttribute conf, FieldInfo fieldInfo)
         {
             this.conf = conf;
             this.fieldInfo = fieldInfo;
         }
 
-        public (IEnumerable<string>, Action<IDictionary<string, string>, IDictionary<string, string>>)
-            Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<string, string>, IDictionary<string, string>)> onChange, bool inUserspace = false)
+        public IDialogElement
+            Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChange, bool inUserspace = false)
         {
             uiBuilder.VerticalLayout(spacing: NeosDialogBuilderMod.SPACING / 2);
             if (conf.secret && !inUserspace)
             {
                 var secretDialog = new SecretDialog(this, dialog, onChange);
-                StaticBuildFunctions.BuildSecretButton(fieldInfo.Name, uiBuilder, () => secretDialog.Open());
+                StaticBuildFunctions.BuildSecretButton(conf.name, uiBuilder, () => secretDialog.Open());
             }
             else
             {
@@ -75,11 +75,11 @@ namespace NeosDialogBuilder
             private readonly T dialog;
             private Slot slot = null;
 
-            public SecretDialog(DialogOption<T, V> option, T dialog, Func<(IDictionary<string, string>, IDictionary<string, string>)> onChangeSource)
+            public SecretDialog(DialogOptionDefinition<T, V> option, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChangeSource)
             {
                 this.dialogBuilder = new DialogBuilder<T>(addDefaults: false, overrideUpdateAndValidate: (_) => onChangeSource())
                         .AddEntry(option)
-                        .AddEntry(new DialogAction<T>(
+                        .AddEntry(new DialogActionDefinition<T>(
                             new DialogActionAttribute(NeosDialogBuilderMod.LABEL_USERSPACE_DIALOG_CLOSE, isValidated: false),
                             (x) => Close()
                             ));

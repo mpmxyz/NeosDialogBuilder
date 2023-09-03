@@ -43,6 +43,11 @@ namespace NeosDialogBuilder//TODO: create custom editor
             return new PageRange(Clamp(min, from, max), Clamp(min, to, max));
         }
 
+        public override string ToString()
+        {
+            return (from == to) ? $"{from}" : $"{from}-{to}";
+        }
+
         private static int Clamp(int min, int x, int max)
         {
             return Math.Min(Math.Max(x, min), max);

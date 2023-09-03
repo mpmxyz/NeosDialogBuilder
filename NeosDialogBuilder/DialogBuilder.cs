@@ -14,17 +14,17 @@ namespace NeosDialogBuilder
     /// Then you can use it as a factory to produce new UIX windows from objects representing your custom dialog.
     /// </summary>
     /// <typeparam name="T">expected dialog object type</typeparam>
-    public partial class DialogBuilder<T> where T : IDialog
+    public partial class DialogBuilder<T> where T : IDialogState
     {
-        private readonly IList<IDialogEntryDefinition<T>> entries = new List<IDialogEntryDefinition<T>>();
-        private readonly Func<T, (IDictionary<string, string>, IDictionary<string, string>)> overrideUpdateAndValidate;
+        private readonly IList<IDialogEntryDefinition<T>> definitions = new List<IDialogEntryDefinition<T>>();
+        private readonly Func<T, (IDictionary<object, string>, IDictionary<object, string>)> overrideUpdateAndValidate;
 
         /// <summary>
         /// Creates a dialog builder that can be configured to create dialog windows.
         /// </summary>
         /// <param name="addDefaults">creates a list of options, an output for errors and a line with buttons based on <typeparamref name="T"/>'s attributes</param>
         /// <param name="overrideUpdateAndValidate">replaces the default validation if not null</param>
-        public DialogBuilder(bool addDefaults = true, Func<T, (IDictionary<string, string>, IDictionary<string, string>)> overrideUpdateAndValidate = null)
+        public DialogBuilder(bool addDefaults = true, Func<T, (IDictionary<object, string>, IDictionary<object, string>)> overrideUpdateAndValidate = null)
         {
             if (addDefaults)
             {
@@ -43,7 +43,7 @@ namespace NeosDialogBuilder
         /// <returns>this</returns>
         public DialogBuilder<T> AddEntry(IDialogEntryDefinition<T> optionField)
         {
-            entries.Add(optionField);
+            definitions.Add(optionField);
             return this;
         }
 
@@ -77,7 +77,7 @@ namespace NeosDialogBuilder
         public DialogBuilder<T> AddAllActions()
         {
             var converterType = typeof(T);
-            var actions = new List<DialogAction<T>>();
+            var actions = new List<DialogActionDefinition<T>>();
             foreach (var methodInfo in converterType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 foreach (var attr in methodInfo.GetCustomAttributes(true))
@@ -88,7 +88,7 @@ namespace NeosDialogBuilder
                         {
                             throw new InvalidOperationException($"DialogAction '{methodInfo.Name}' must have no arguments!");
                         }
-                        actions.Add(new DialogAction<T>(conf, (dialog) => methodInfo.Invoke(dialog, new object[] { })));
+                        actions.Add(new DialogActionDefinition<T>(conf, (dialog) => methodInfo.Invoke(dialog, new object[] { })));
                         break;
                     }
                 }
@@ -106,7 +106,7 @@ namespace NeosDialogBuilder
         /// <returns>this</returns>
         public DialogBuilder<T> AddOption(DialogOptionAttribute conf, FieldInfo fieldInfo)
         {
-            var genType = typeof(DialogOption<,>).MakeGenericType(typeof(T), fieldInfo.FieldType);
+            var genType = typeof(DialogOptionDefinition<,>).MakeGenericType(typeof(T), fieldInfo.FieldType);
             var cons = genType.GetConstructor(
                     new Type[] {
                         typeof(DialogOptionAttribute),
@@ -124,7 +124,7 @@ namespace NeosDialogBuilder
         /// <returns>this</returns>
         public DialogBuilder<T> AddLine(IEnumerable<IDialogEntryDefinition<T>> elements)
         {
-            AddEntry(new DialogLine<T>(elements));
+            AddEntry(new DialogLineDefinition<T>(elements));
             return this;
         }
 
@@ -134,7 +134,7 @@ namespace NeosDialogBuilder
         /// <returns>this</returns>
         public DialogBuilder<T> AddUnboundErrorDisplay()
         {
-            AddEntry(new DialogErrorDisplay<T>(onlyUnbound: true));
+            AddEntry(new DialogErrorDisplayDefinition<T>(onlyUnbound: true));
             return this;
         }
 
@@ -145,16 +145,16 @@ namespace NeosDialogBuilder
         /// <param name="dialog">object that will be configured by the UI</param>
         public void BuildInPlace(UIBuilder uiBuilder, T dialog)
         {
-            var errorSetters = new List<Action<IDictionary<string, string>, IDictionary<string, string>>>();
-            var boundErrorKeys = new HashSet<string>();
+            var elements = new List<IDialogElement>();
+            var boundErrorKeys = new HashSet<object>();
             var world = uiBuilder.World;
             var inUserspace = world.IsUserspace();
 
             uiBuilder.Root.OnPrepareDestroy += (slot) => dialog.OnDestroy();
 
-            (IDictionary<string, string>, IDictionary<string, string>) onChange()
+            (IDictionary<object, string>, IDictionary<object, string>) onChange()
             {
-                IDictionary<string, string> errors, unboundErrors;
+                IDictionary<object, string> errors, unboundErrors;
                 if (overrideUpdateAndValidate != null)
                 {
                     (errors, unboundErrors) = overrideUpdateAndValidate(dialog);
@@ -162,7 +162,7 @@ namespace NeosDialogBuilder
                 else
                 {
                     errors = dialog.UpdateAndValidate();
-                    unboundErrors = new Dictionary<string, string>(errors);
+                    unboundErrors = new Dictionary<object, string>(errors);
                     foreach (var errorKey in boundErrorKeys)
                     {
                         unboundErrors.Remove(errorKey);
@@ -171,22 +171,25 @@ namespace NeosDialogBuilder
 
                 world.RunSynchronously(() =>
                 {
-                    foreach (var setErrors in errorSetters)
+                    foreach (var element in elements)
                     {
-                        setErrors(errors, unboundErrors);
+                        element.DisplayErrors(errors, unboundErrors);
                     }
                 });
 
                 return (errors, unboundErrors);
             }
 
-            foreach (var option in entries)
+            foreach (var definition in definitions)
             {
-                (var keys, var setErrors) = option.Create(uiBuilder, dialog, onChange, inUserspace);
-                errorSetters.Add(setErrors);
-                foreach (var key in keys)
+                var element = definition.Create(uiBuilder, dialog, onChange, inUserspace);
+                if (element != null)
                 {
-                    boundErrorKeys.Add(key);
+                    elements.Add(element);
+                    foreach (var key in element.BoundErrorKeys)
+                    {
+                        boundErrorKeys.Add(key);
+                    }
                 }
             }
 

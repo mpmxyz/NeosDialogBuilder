@@ -9,6 +9,38 @@ namespace NeosDialogBuilder
 {
     internal class StaticBuildFunctions
     {
+        private class MappedValue<I, O>
+        {
+            internal O OValue;
+            internal I IValue
+            {
+                get
+                {
+                    if (mapper.TryUnmap(OValue, out var iVal))
+                    {
+                        return iVal;
+                    }
+                    else
+                    {
+                        return default;
+                    }
+                }
+                set
+                {
+                    if (mapper.TryMap(value, out var oVal))
+                    {
+                        OValue = oVal;
+                    }
+                }
+            }
+            private readonly IReversibleMapper<I, O> mapper;
+
+            public MappedValue(I value, IReversibleMapper<I, O> mapper)
+            {
+                this.mapper = mapper;
+                this.IValue = value;
+            }
+        }
 
         internal static void BuildEditor(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange, UIBuilder uiBuilder, DialogOptionAttribute conf)
         {
@@ -24,7 +56,23 @@ namespace NeosDialogBuilder
             {
                 throw new ArgumentNullException(nameof(prop));
             }
+            if (onChange == null)
+            {
+                throw new ArgumentNullException(nameof(onChange));
+            }
+            if (uiBuilder == null)
+            {
+                throw new ArgumentNullException(nameof(uiBuilder));
+            }
+            if (conf == null)
+            {
+                throw new ArgumentNullException(nameof(conf));
+            }
 
+            if (conf.toNeosMapper != null)
+            {
+                ApplyMapping(conf.toNeosMapper, ref valueObj, ref prop, ref onChange);
+            }
             SyncMemberEditorBuilder.Build(
                 BuildField(ifieldSlot, valueObj, prop, onChange),
                 conf.name,
@@ -44,6 +92,40 @@ namespace NeosDialogBuilder
                     }
                 );
             }
+        }
+
+        private static void ApplyMapping(Type reversibleMapper, ref object valueObj, ref FieldInfo prop, ref Action onChange)
+        {
+            //save original values to create adapters
+            object originalObj = valueObj;
+            FieldInfo originalProp = prop;
+            Action originalOnChange = onChange;
+
+            //create adapters
+            Type[] mappingTypes = reversibleMapper.GetGenericArgumentsFromInterface(typeof(IReversibleMapper<,>));
+            if (mappingTypes == null)
+            {
+                throw new ArgumentException("Expected implementation of " + typeof(IReversibleMapper<,>).Name, nameof(DialogOptionAttribute.toNeosMapper));
+            }
+            Type adaptedType = typeof(MappedValue<,>).MakeGenericType(mappingTypes);
+            FieldInfo adaptedProp = adaptedType.GetField(nameof(MappedValue<object, object>.OValue), BindingFlags.NonPublic | BindingFlags.Instance);
+            PropertyInfo iValueProp = adaptedType.GetProperty(nameof(MappedValue<object, object>.IValue), BindingFlags.NonPublic | BindingFlags.Instance);
+            object mapperInstance = reversibleMapper.GetConstructor(new Type[0]).Invoke(new object[0]);
+            object adaptedObj = adaptedType
+                .GetConstructor(new Type[] { mappingTypes[0], typeof(IReversibleMapper<,>).MakeGenericType(mappingTypes) })
+                .Invoke(new object[] { originalProp.GetValue(originalObj), mapperInstance});
+            void adaptedOnChange()
+            {
+                object newValue = iValueProp.GetValue(adaptedObj);
+                UniLog.Log(newValue);
+                originalProp.SetValue(originalObj, newValue);
+                originalOnChange();
+            }
+
+            //replace original values with adapters
+            valueObj = adaptedObj;
+            prop = adaptedProp;
+            onChange = adaptedOnChange;
         }
 
         internal static void BuildSecretButton(string name, UIBuilder uiBuilder, Action onClick)

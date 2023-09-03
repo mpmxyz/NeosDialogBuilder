@@ -5,11 +5,50 @@ using System.Linq;
 
 namespace NeosDialogBuilder
 {
+    
     /// <summary>
     /// This class demonstrates how to use the library.
     /// </summary>
-    internal class TestDialog : IDialog
+    internal class TestDialog : IDialogState
     {
+        private class ListMapper : IReversibleMapper<List<string>, string>
+        {
+            public ListMapper() { }
+
+            public bool TryMap(List<string> value, out string mapped)
+            {
+                if (value == null)
+                {
+                    mapped = null;
+                }
+                else
+                {
+                    List<string> valueWithSeps = new List<string>();
+                    bool first = true;
+                    foreach (string str in value)
+                    {
+                        if (!first)
+                        {
+                            valueWithSeps.Add(",");
+                        }
+                        valueWithSeps.Add(str);
+                        first = false;
+                    }
+                    mapped = string.Concat(valueWithSeps);
+                }
+                return true;
+            }
+
+            public bool TryUnmap(string value, out List<string> unmapped)
+            {
+                unmapped = value != null ? new List<string>(value?.Split(',')) : null;
+                return true;
+            }
+        }
+
+        [DialogOption("List", toNeosMapper: typeof(ListMapper))]
+        List<string> list = new List<string>(new string[] {"A", "B", "C"});
+
         [DialogOption("Output")]
         IField<string> output;
 
@@ -22,45 +61,47 @@ namespace NeosDialogBuilder
         public void OnLeft()
         {
             UniLog.Log("OnLeft");
-            if (output != null)
-            {
-                output.World.RunSynchronously(() => output.Value = "OnLeft");
-            }
+            output?.World.RunSynchronously(() => output.Value = "OnLeft");
         }
 
         [DialogAction("Middle", isValidated: false)]
         public void OnMiddle()
         {
             UniLog.Log("OnMiddle");
-            if (output != null)
-            {
-                output.World.RunSynchronously(() => output.Value = "OnMiddle");
-            }
+            output?.World.RunSynchronously(() => output.Value = "OnMiddle");
         }
 
         [DialogAction("Right", onlyValidating: new string[] { "text" })]
         public void OnRight()
         {
             UniLog.Log("OnRight");
-            if (output != null)
-            {
-                output.World.RunSynchronously(() => output.Value = "OnRight");
-            }
+            output?.World.RunSynchronously(() => output.Value = "OnRight");
         }
 
         public void OnDestroy()
         {
             UniLog.Log("OnDestroy");
-            if (output != null)
-            {
-                output.World.RunSynchronously(() => output.Value = "OnDestroy");
-            }
+            output?.World.RunSynchronously(() => output.Value = "OnDestroy");
         }
 
         public IDictionary<string, string> UpdateAndValidate()
         {
-            UniLog.Log($"Validate {matrix} {text} {output}");
             var errors = new Dictionary<string, string>();
+            UniLog.Log($"Validate {matrix} {text} {output}");
+            if (list != null) {
+                UniLog.Log($"List with {list.Count} items:");
+                foreach (var item in list) {
+                    UniLog.Log($" {item}");
+                    if (item.Length == 0)
+                    {
+                        errors.Add(nameof(list), "Items must be non-empty!");
+                    }
+                }
+            }
+            else
+            {
+                UniLog.Log("No list");
+            }
             if (matrix.Determinant == 0.0)
             {
                 errors.Add(nameof(matrix), "Determinant == 0");
@@ -77,10 +118,7 @@ namespace NeosDialogBuilder
             {
                 errors.Add("special", "lowercase text and matrix_0_0 == 0");
             }
-            if (output != null)
-            {
-                output.World.RunSynchronously(() => output.Value = $"{matrix} {text}");
-            }
+            output?.World.RunSynchronously(() => output.Value = $"{matrix} {text}");
             UniLog.Log($"Validated: {errors}");
             return errors;
         }
