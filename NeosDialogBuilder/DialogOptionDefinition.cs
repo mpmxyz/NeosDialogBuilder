@@ -80,7 +80,8 @@ namespace NeosDialogBuilder
                 this.dialogBuilder = new DialogBuilder<T>(addDefaults: false, overrideUpdateAndValidate: (_) => onChangeSource())
                         .AddEntry(option)
                         .AddEntry(new DialogActionDefinition<T>(
-                            new DialogActionAttribute(NeosDialogBuilderMod.LABEL_USERSPACE_DIALOG_CLOSE, isValidated: false),
+                            null,
+                            new DialogActionAttribute(NeosDialogBuilderMod.LABEL_USERSPACE_DIALOG_CLOSE, onlyValidating: new object[0]),
                             (x) => Close()
                             ));
                 this.title = option.conf.name;

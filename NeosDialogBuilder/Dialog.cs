@@ -3,16 +3,26 @@ using System.Collections.Generic;
 
 namespace NeosDialogBuilder
 {
-    public class Dialog : DialogElementContainer
+    public class Dialog : DialogElementContainerBase
     {
-        private readonly IDialogState state;
+        private readonly Slot _Slot;
+        private readonly IEnumerable<IDialogElement> _Elements;
 
-        internal Dialog(IDialogState state, object key, Slot root, IEnumerable<IDialogElement> elements) : base(key, root, elements)
+        internal Dialog(IDialogState state, Slot slot, IEnumerable<IDialogElement> elements)
         {
-            this.state = state;
+            _Slot = slot;
+            _Elements = elements;
             state.Dialog = this;
         }
 
+        public override object Key => this;
 
+        public override bool Visible
+        {
+            get => _Slot.ActiveSelf;
+            set => _Slot.ActiveSelf = value;
+        }
+
+        internal override IEnumerable<IDialogElement> Elements => _Elements;
     }
 }

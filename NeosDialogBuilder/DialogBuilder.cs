@@ -88,7 +88,7 @@ namespace NeosDialogBuilder
                         {
                             throw new InvalidOperationException($"DialogAction '{methodInfo.Name}' must have no arguments!");
                         }
-                        actions.Add(new DialogActionDefinition<T>(conf, (dialog) => methodInfo.Invoke(dialog, new object[] { })));
+                        actions.Add(new DialogActionDefinition<T>(methodInfo.Name, conf, (dialog) => methodInfo.Invoke(dialog, new object[] { })));
                         break;
                     }
                 }
@@ -134,7 +134,7 @@ namespace NeosDialogBuilder
         /// <returns>this</returns>
         public DialogBuilder<T> AddUnboundErrorDisplay()
         {
-            AddEntry(new DialogErrorDisplayDefinition<T>(onlyUnbound: true));
+            AddEntry(new DialogErrorDisplayDefinition<T>(null, onlyUnbound: true));
             return this;
         }
 
