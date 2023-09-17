@@ -57,6 +57,8 @@ namespace NeosDialogBuilder
         [DialogOption("Some Text")]
         string text;
 
+        public Dialog Dialog { set => throw new System.NotImplementedException(); }
+
         [DialogAction("Left")]
         public void OnLeft()
         {
@@ -64,14 +66,14 @@ namespace NeosDialogBuilder
             output?.World.RunSynchronously(() => output.Value = "OnLeft");
         }
 
-        [DialogAction("Middle", isValidated: false)]
+        [DialogAction("Middle", onlyValidating: new object[0])]
         public void OnMiddle()
         {
             UniLog.Log("OnMiddle");
             output?.World.RunSynchronously(() => output.Value = "OnMiddle");
         }
 
-        [DialogAction("Right", onlyValidating: new string[] { "text" })]
+        [DialogAction("Right", onlyValidating: new object[] { "text" })]
         public void OnRight()
         {
             UniLog.Log("OnRight");
@@ -84,9 +86,9 @@ namespace NeosDialogBuilder
             output?.World.RunSynchronously(() => output.Value = "OnDestroy");
         }
 
-        public IDictionary<string, string> UpdateAndValidate()
+        public IDictionary<object, string> UpdateAndValidate()
         {
-            var errors = new Dictionary<string, string>();
+            var errors = new Dictionary<object, string>();
             UniLog.Log($"Validate {matrix} {text} {output}");
             if (list != null) {
                 UniLog.Log($"List with {list.Count} items:");

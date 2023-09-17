@@ -9,7 +9,7 @@ namespace NeosDialogBuilder
 {
     internal class StaticBuildFunctions
     {
-        private class MappedValue<I, O>
+        private class MappedValue<I, O> //TODO: ensure that reset works with mapping
         {
             internal O OValue;
             internal I IValue
@@ -42,7 +42,7 @@ namespace NeosDialogBuilder
             }
         }
 
-        internal static void BuildEditor(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange, UIBuilder uiBuilder, DialogOptionAttribute conf)
+        internal static Action BuildEditor(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange, UIBuilder uiBuilder, DialogOptionAttribute conf)
         {
             if (ifieldSlot == null)
             {
@@ -73,8 +73,9 @@ namespace NeosDialogBuilder
             {
                 ApplyMapping(conf.toNeosMapper, ref valueObj, ref prop, ref onChange);
             }
+            (IField field, Action reset) = BuildField(ifieldSlot, valueObj, prop, onChange);
             SyncMemberEditorBuilder.Build(
-                BuildField(ifieldSlot, valueObj, prop, onChange),
+                field,
                 conf.name,
                 prop,
                 uiBuilder
@@ -92,6 +93,7 @@ namespace NeosDialogBuilder
                     }
                 );
             }
+            return reset;
         }
 
         private static void ApplyMapping(Type reversibleMapper, ref object valueObj, ref FieldInfo prop, ref Action onChange)
@@ -150,9 +152,9 @@ namespace NeosDialogBuilder
             uiBuilder.PopStyle();
         }
 
-        private static IField BuildField(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange)
+        private static (IField field, Action reset) BuildField(Slot ifieldSlot, object valueObj, FieldInfo prop, Action onChange)
         {
-            return (IField)FieldBuilder(prop)
+            return ((IField field, Action reset))FieldBuilder(prop)
                 ?.Invoke(null, new object[] { ifieldSlot, valueObj, prop, onChange });
         }
 
@@ -171,28 +173,40 @@ namespace NeosDialogBuilder
             }
         }
 
-        private static IField BuildReferenceField<V>(Slot slot, object obj, FieldInfo prop, Action onChange) where V : class, IWorldElement
+        private static (IField field, Action reset) BuildReferenceField<V>(Slot slot, object obj, FieldInfo prop, Action onChange) where V : class, IWorldElement
         {
             var value = slot.AttachComponent<ReferenceField<V>>().Reference;
-            value.Target = (V)prop.GetValue(obj);
+
+            void reset()
+            {
+                value.Target = (V)prop.GetValue(obj);
+            }
+
+            reset();
             value.OnTargetChange += (x) =>
             {
                 prop.SetValue(obj, x.Target);
                 onChange();
             };
-            return value;
+            return (value, reset);
         }
 
-        private static IField BuildValueField<V>(Slot slot, object obj, FieldInfo prop, Action onChange)
+        private static (IField field, Action reset) BuildValueField<V>(Slot slot, object obj, FieldInfo prop, Action onChange)
         {
             var value = slot.AttachComponent<ValueField<V>>().Value;
-            value.Value = (V)prop.GetValue(obj);
+
+            void reset()
+            {
+                value.Value = (V)prop.GetValue(obj);
+            }
+
+            reset();
             value.OnValueChange += (x) =>
             {
                 prop.SetValue(obj, x.Value);
                 onChange();
             };
-            return value;
+            return (value, reset);
         }
 
 

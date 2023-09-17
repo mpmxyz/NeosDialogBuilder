@@ -10,46 +10,43 @@ namespace NeosDialogBuilder
     /// <typeparam name="T">type of the dialog object</typeparam>
     public class DialogLineDefinition<T> : IDialogEntryDefinition<T> where T : IDialogState
     {
-        private readonly IEnumerable<IDialogEntryDefinition<T>> elements;
+        private readonly IEnumerable<IDialogEntryDefinition<T>> _Elements;
+        private readonly object _Key;
 
         /// <summary>
         /// Creates a line of sub-elements
         /// </summary>
+        /// <param name="key"></param>
         /// <param name="elements"></param>
-        public DialogLineDefinition(IEnumerable<IDialogEntryDefinition<T>> elements)
+        public DialogLineDefinition(object key, IEnumerable<IDialogEntryDefinition<T>> elements)
         {
-            this.elements = elements;
+            this._Key = key;
+            this._Elements = elements;
         }
 
         public IDialogElement
             Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChange, bool inUserspace = false)
         {
-            var allErrorSetters = new List<Action<IDictionary<object, string>, IDictionary<object, string>>>();
-            var allErrors = new HashSet<string>();
+            var allInstances = new List<IDialogElement>();
 
             uiBuilder.PushStyle();
-            uiBuilder.HorizontalLayout(spacing: NeosDialogBuilderMod.SPACING);
+            var slot = uiBuilder.HorizontalLayout(spacing: NeosDialogBuilderMod.SPACING).Slot;
             uiBuilder.Style.FlexibleWidth = 1;
             uiBuilder.Style.ForceExpandWidth = true;
-            foreach (var entry in elements)
+
+
+            foreach (var entry in _Elements)
             {
-                (var errors, var errorSetter) = entry.Create(uiBuilder, dialog, onChange, inUserspace);
-                allErrorSetters.Add(errorSetter);
-                foreach (var error in errors)
+                var instance = entry.Create(uiBuilder, dialog, onChange, inUserspace);
+                if (instance != null)
                 {
-                    allErrors.Add(error);
+                    allInstances.Add(instance);
                 }
             }
+
             uiBuilder.NestOut();
             uiBuilder.PopStyle();
-            return (allErrors, (errors, unboundErrors) =>
-            {
-                foreach (var errorSetter in allErrorSetters)
-                {
-                    errorSetter(errors, unboundErrors);
-                }
-            }
-            );
+            return new DialogElementContainer(_Key, slot, allInstances);
         }
     }
 }

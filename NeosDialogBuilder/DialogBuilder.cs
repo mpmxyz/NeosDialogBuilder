@@ -93,7 +93,7 @@ namespace NeosDialogBuilder
                     }
                 }
             }
-            AddLine(actions);
+            AddLine(null, actions);
 
             return this;
         }
@@ -122,9 +122,9 @@ namespace NeosDialogBuilder
         /// </summary>
         /// <param name="elements">Elements that will be placed in a single line.</param>
         /// <returns>this</returns>
-        public DialogBuilder<T> AddLine(IEnumerable<IDialogEntryDefinition<T>> elements)
+        public DialogBuilder<T> AddLine(object key, IEnumerable<IDialogEntryDefinition<T>> elements)
         {
-            AddEntry(new DialogLineDefinition<T>(elements));
+            AddEntry(new DialogLineDefinition<T>(key, elements));
             return this;
         }
 
@@ -151,7 +151,7 @@ namespace NeosDialogBuilder
             var inUserspace = world.IsUserspace();
 
             uiBuilder.Root.OnPrepareDestroy += (slot) => dialog.OnDestroy();
-
+            
             (IDictionary<object, string>, IDictionary<object, string>) onChange()
             {
                 IDictionary<object, string> errors, unboundErrors;
@@ -206,6 +206,8 @@ namespace NeosDialogBuilder
         public Slot BuildWindow(string title, World world, T dialog)
         {
             var slot = world.AddSlot(title, persistent: false);
+            //TODO: adjust to return dialog instance and window slot (combined in DialogWindow?
+            //)
 
             var panel = slot.AttachComponent<NeosCanvasPanel>();
             panel.Panel.Title = title;

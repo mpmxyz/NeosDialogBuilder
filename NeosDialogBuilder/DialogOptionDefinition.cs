@@ -32,16 +32,22 @@ namespace NeosDialogBuilder
         public IDialogElement
             Create(UIBuilder uiBuilder, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChange, bool inUserspace = false)
         {
-            uiBuilder.VerticalLayout(spacing: NeosDialogBuilderMod.SPACING / 2);
+            var slot = uiBuilder.VerticalLayout(spacing: NeosDialogBuilderMod.SPACING / 2).Slot;
+            IValue<string> errorTextContent;
+            Action reset;
+
             if (conf.secret && !inUserspace)
             {
+                //TODO: ensure proper reset functionality
                 var secretDialog = new SecretDialog(this, dialog, onChange);
+                reset = secretDialog.Reset;
                 StaticBuildFunctions.BuildSecretButton(conf.name, uiBuilder, () => secretDialog.Open());
             }
             else
             {
-                StaticBuildFunctions.BuildEditor(uiBuilder.Root, dialog, fieldInfo, () => onChange(), uiBuilder, conf);
+                reset = StaticBuildFunctions.BuildEditor(uiBuilder.Root, dialog, fieldInfo, () => onChange(), uiBuilder, conf);
             }
+            var key = fieldInfo.Name;
             if (conf.showErrors)
             {
                 uiBuilder.PushStyle();
@@ -50,18 +56,57 @@ namespace NeosDialogBuilder
                 var errorText = uiBuilder.Text("", alignment: Alignment.TopRight);
                 uiBuilder.PopStyle();
                 uiBuilder.NestOut();
-                var key = fieldInfo.Name;
-                return (new List<string>() { key }, (allErrors, unboundErrors) =>
-                    {
-                        errorText.Content.Value = allErrors.TryGetValue(key, out var error)
-                                ? $"<b>{error}</b>"
-                                : "";
-                    }
-                );
+                errorTextContent = errorText.Content;
             }
             else
             {
-                return (new List<string>(), (allErrors, unboundErrors) => { });
+                errorTextContent = null;
+            }
+            return new Element(key, slot, errorTextContent, reset);
+        }
+
+        private class Element : DialogElementBase
+        {
+            private readonly object _Key;
+            private readonly Slot _Slot;
+            private readonly IValue<string> _ErrorField;
+            private readonly Action _Reset;
+
+            public Element(object key, Slot slot, IValue<string> errorField, Action reset)
+            {
+                _Key = key;
+                _Slot = slot;
+                _ErrorField = errorField;
+                _Reset = reset;
+            }
+
+            public override object Key => _Key;
+
+            public override IEnumerable<object> BoundErrorKeys => new List<object>(new object[] { _Key });
+
+            public override bool Visible
+            { 
+                get => _Slot.ActiveSelf; 
+                set => _Slot.ActiveSelf = value;
+            }
+            internal override bool EffectivelyEnabled
+            {
+                set => _Slot.GetComponentsInChildren<InteractionElement>().ForEach(it => it.Enabled = value);
+            }
+
+            public override void DisplayErrors(IDictionary<object, string> allErrors, IDictionary<object, string> unboundErrors)
+            {
+                if (_ErrorField != null)
+                {
+                    _ErrorField.Value = allErrors.TryGetValue(_Key, out var error)
+                                    ? $"<b>{error}</b>"
+                                    : "";
+                }
+            }
+
+            public override void Reset()
+            {
+                _Reset();
             }
         }
 
@@ -77,6 +122,7 @@ namespace NeosDialogBuilder
 
             public SecretDialog(DialogOptionDefinition<T, V> option, T dialog, Func<(IDictionary<object, string>, IDictionary<object, string>)> onChangeSource)
             {
+                //TODO: Dialog binding to IDialogState must be adjusted to cater for popups like this (potential target: condition/config in builder)
                 this.dialogBuilder = new DialogBuilder<T>(addDefaults: false, overrideUpdateAndValidate: (_) => onChangeSource())
                         .AddEntry(option)
                         .AddEntry(new DialogActionDefinition<T>(
@@ -106,6 +152,11 @@ namespace NeosDialogBuilder
                     slot?.Destroy();
                     slot = null;
                 });
+            }
+
+            public void Reset()
+            {
+
             }
         }
     }
